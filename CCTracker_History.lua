@@ -607,11 +607,13 @@ local function GetOrCreateEntry(index)
 end
 
 local BADGE_COLORS = {
-    arena  = { 1,    0.3,  0.3 },
-    pvp    = { 0.3,  0.6,  1   },
-    party  = { 0.3,  1,    0.5 },
-    raid   = { 0.8,  0.3,  1   },
-    world  = { 0.7,  0.7,  0.7 },
+    arena          = { 1,    0.3,  0.3 },   -- legacy
+    arena_rated    = { 1,    0.3,  0.3 },
+    arena_skirmish = { 1,    0.3,  0.3 },
+    pvp            = { 0.3,  0.6,  1   },
+    party          = { 0.3,  1,    0.5 },
+    raid           = { 0.8,  0.3,  1   },
+    world          = { 0.7,  0.7,  0.7 },
 }
 
 function CCTracker_History:RefreshList()

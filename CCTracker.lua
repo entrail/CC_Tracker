@@ -5,10 +5,10 @@ CCTracker = {}
 
 -- Upvalues
 local playerGUID
-local petGUID       -- player's active pet (Succubus, Felhunter, Hunter pet, etc.)
-local totemGUIDs = {}  -- GUIDs of the player's active totems (cleared on UNIT_DIED/zone change)
-local charKey       -- "CharName-Realm", used to tag sessions per character
-local HOSTILE_FLAG = COMBATLOG_OBJECT_REACTION_HOSTILE or 0x00000040
+local petGUID   -- player's active pet (Succubus, Felhunter, Hunter pet, etc.)
+local charKey   -- "CharName-Realm", used to tag sessions per character
+local HOSTILE_FLAG  = COMBATLOG_OBJECT_REACTION_HOSTILE     or 0x00000040
+local OUTSIDER_FLAG = COMBATLOG_OBJECT_AFFILIATION_OUTSIDER or 0x00000008
 
 -- Tracks active defensive buffs on all units: [unitGUID][spellId] = true
 CCTracker.enemyBuffs = {}
@@ -347,21 +347,9 @@ local function OnCombatLog()
         destGUID, destName, destFlags, _,
         spellId, spellName, _, p15 = CombatLogGetCurrentEventInfo()
 
-    -- Clear buff table when a unit dies; also remove from totem set if relevant
+    -- Clear buff table when a unit dies
     if subevent == "UNIT_DIED" or subevent == "UNIT_DESTROYED" then
         CCTracker.enemyBuffs[destGUID] = nil
-        totemGUIDs[destGUID] = nil
-        return
-    end
-
-    -- Register totems summoned by the player so their SPELL_AURA_APPLIED events
-    -- are attributed to the player (totems appear as their own GUID in the combat log).
-    -- SPELL_CREATE is checked too in case the client uses it for totem objects.
-    if (subevent == "SPELL_SUMMON" or subevent == "SPELL_CREATE") and sourceGUID == playerGUID then
-        if destName and destName:find("Totem", 1, true) then
-            totemGUIDs[destGUID] = true
-            CCTracker.Log("Totem registered: " .. destName .. " guid=" .. tostring(destGUID))
-        end
         return
     end
 
@@ -391,9 +379,15 @@ local function OnCombatLog()
         if not CCTrackerDB.currentSession then return end   -- open world, skip
     end
 
-    -- ── Outgoing: player (or player's pet/totem) cast on an enemy ────────────
-    if (sourceGUID == playerGUID or (petGUID and sourceGUID == petGUID) or totemGUIDs[sourceGUID])
-    and destFlags and bit.band(destFlags, HOSTILE_FLAG) > 0 then
+    -- CC spell detected — cancel any deferred arena session end (gate-open false alarm).
+    CCTracker_Session:CancelPendingEnd()
+
+    -- ── Outgoing: player (or player's pet) cast on an enemy ──────────────────
+    -- Accept HOSTILE (open-world NPCs) or OUTSIDER (arena/BG enemy players, who may not
+    -- carry the HOSTILE reaction flag in TBC's combat-log unit flag encoding).
+    if (sourceGUID == playerGUID or (petGUID and sourceGUID == petGUID))
+    and destFlags
+    and (bit.band(destFlags, HOSTILE_FLAG) > 0 or bit.band(destFlags, OUTSIDER_FLAG) > 0) then
 
         if spellData.ccType == "aura" then
             if (subevent == "SPELL_AURA_APPLIED" or subevent == "SPELL_AURA_REFRESH")
@@ -464,7 +458,6 @@ frame:SetScript("OnEvent", function(self, event, ...)
     elseif event == "PLAYER_ENTERING_WORLD" then
         playerGUID = playerGUID or UnitGUID("player")
         petGUID    = UnitGUID("pet")
-        totemGUIDs = {}
         CCTracker.enemyBuffs = {}
         local _, iType = GetInstanceInfo()
         CCTracker.Log("PLAYER_ENTERING_WORLD. instanceType=" .. tostring(iType) .. " zone=" .. tostring(GetZoneText()))

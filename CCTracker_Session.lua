@@ -5,6 +5,54 @@ CCTracker_Session = {}
 
 local sessionIdCounter = 0
 
+-- ── Deferred arena/pvp session end (timer-based) ────────────────────────────
+-- In TBC Anniversary both PLAYER_ENTERING_WORLD and ZONE_CHANGED_NEW_AREA fire with
+-- instanceType="none" when the arena gate opens — identical to actually leaving the
+-- arena.  We can't tell the two apart by event alone, so instead we wait a few
+-- seconds: if CC activity fires in that window the player is still fighting and we
+-- keep the session alive; otherwise we assume they've left and close it.
+-- (C_Timer doesn't exist in TBC, so we use an OnUpdate frame.)
+
+local ARENA_END_DELAY = 6     -- seconds to wait before confirming arena exit
+local arenaEndSession = nil   -- session object waiting for confirmation; nil = idle
+local arenaEndElapsed = 0
+
+local arenaEndFrame = CreateFrame("Frame")
+arenaEndFrame:Hide()
+arenaEndFrame:SetScript("OnUpdate", function(self, dt)
+    arenaEndElapsed = arenaEndElapsed + dt
+    if arenaEndElapsed < ARENA_END_DELAY then return end
+
+    self:Hide()
+    local s        = arenaEndSession
+    arenaEndSession = nil
+    arenaEndElapsed = 0
+    if not s then return end
+
+    local _, iType = GetInstanceInfo()
+    if (not iType or iType == "none") and CCTrackerDB.currentSession == s then
+        CCTracker.Log("ArenaEndTimer: " .. ARENA_END_DELAY .. "s elapsed, confirming arena exit")
+        CCTracker_Session:EndCurrentSession()
+    else
+        CCTracker.Log("ArenaEndTimer: back in instance or session changed — keeping session")
+    end
+end)
+
+local function ScheduleArenaEnd(session)
+    if arenaEndSession == session then return end  -- already scheduled for this session
+    arenaEndSession = session
+    arenaEndElapsed = 0
+    arenaEndFrame:Show()
+    CCTracker.Log("ArenaEnd: scheduled in " .. ARENA_END_DELAY .. "s")
+end
+
+local function CancelArenaEnd()
+    if not arenaEndSession then return end
+    arenaEndSession = nil
+    arenaEndFrame:Hide()
+    CCTracker.Log("ArenaEnd: cancelled (CC activity or re-entered instance)")
+end
+
 local function NewSessionId()
     sessionIdCounter = sessionIdCounter + 1
     return sessionIdCounter
@@ -117,13 +165,16 @@ function CCTracker_Session:OnEnterWorld()
 
     if instanceType == "none" then
         -- Open world / loading screen.
-        -- Arenas and BGs: leaving to open world means the match is over — end immediately.
         -- World sessions: just update the zone label and keep accumulating.
         -- Dungeons and raids: keep alive (corpse run through open world).
+        -- Arenas/BGs: schedule a delayed end — both PLAYER_ENTERING_WORLD and
+        -- ZONE_CHANGED_NEW_AREA fire with "none" at gate-open, so we can't end
+        -- immediately.  The timer fires after ARENA_END_DELAY seconds; CC activity
+        -- during that window cancels it (player is still fighting).
         if current then
             local t = current.type
             if t == "arena" or t == "arena_rated" or t == "arena_skirmish" or t == "pvp" then
-                self:EndCurrentSession()
+                ScheduleArenaEnd(current)
             elseif t == "world" then
                 local newName = GetZoneName()
                 current.name = newName
@@ -133,6 +184,9 @@ function CCTracker_Session:OnEnterWorld()
         end
         return
     end
+
+    -- Entering an instance — cancel any pending arena end (was a false alarm).
+    CancelArenaEnd()
 
     -- ── Entering an instance ─────────────────────────────────────────────────
     if current then
@@ -168,9 +222,19 @@ function CCTracker_Session:TryStartFromInstance()
     end
 end
 
+function CCTracker_Session:CancelPendingEnd()
+    CancelArenaEnd()
+end
+
 function CCTracker_Session:OnZoneChanged()
     local iName, instanceType, difficultyID, mapID = GetInstanceDetails()
     local current = CCTrackerDB.currentSession
+
+    -- If we're confirmed back inside an instance, the arena-end timer was a false
+    -- alarm (gate-open).  Cancel it so the session is kept.
+    if instanceType ~= "none" then
+        CancelArenaEnd()
+    end
 
     if instanceType ~= "none" and not current then
         -- Session wasn't created during PLAYER_ENTERING_WORLD (GetInstanceInfo timing).
@@ -193,11 +257,13 @@ function CCTracker_Session:OnZoneChanged()
             return
         end
 
-        -- Update session name if the sub-zone label changed (instances).
-        local suffix = (instanceType == "party") and (DIFF_SUFFIX[difficultyID] or "") or ""
-        local newName = iName .. suffix
-        if newName ~= "" and newName ~= current.name then
-            current.name = newName
+        -- Update session name if the sub-zone label changed (instances only).
+        if instanceType ~= "none" then
+            local suffix = (instanceType == "party") and (DIFF_SUFFIX[difficultyID] or "") or ""
+            local newName = iName .. suffix
+            if newName ~= "" and newName ~= current.name then
+                current.name = newName
+            end
         end
     end
 end
