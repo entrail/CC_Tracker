@@ -1,0 +1,14 @@
+## Interface: 20505
+## Title: CCTracker
+## Notes: Tracks self-cast crowd control spell outcomes per session (Arena, BG, Dungeon)
+## Author:
+## Version: 1.0.0
+## SavedVariables: CCTrackerDB CCTrackerLog
+
+CCTracker_Data.lua
+CCTracker.lua
+CCTracker_Session.lua
+CCTracker_Minimap.lua
+CCTracker_Widget.lua
+CCTracker_History.lua
+CCTracker_Options.lua
