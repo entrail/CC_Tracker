@@ -7,7 +7,7 @@ local WIN_W, WIN_H      = 780, 520
 local LIST_W            = 260
 local DETAIL_X          = LIST_W + 20
 local DETAIL_W          = WIN_W - DETAIL_X - 14
-local ENTRY_H           = 30
+local ENTRY_H           = 44
 
 -- Filter state
 -- filterTypes: multi-select table — true = include this type in the history list.
@@ -252,6 +252,39 @@ local function AddDetailSeparator(parent, yOfs)
     return row
 end
 
+local SPELL_ROW_H = 20
+local SPELL_ICON  = 16
+
+local function AddSpellRow(parent, yOfs, spellId, name, rightText, lr, lg, lb, rr, rg, rb)
+    local row = CreateFrame("Frame", nil, parent)
+    row:SetHeight(SPELL_ROW_H)
+    row:SetPoint("TOPLEFT",  parent, "TOPLEFT",  8,  yOfs)
+    row:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -8, yOfs)
+
+    local icon = row:CreateTexture(nil, "ARTWORK")
+    icon:SetSize(SPELL_ICON, SPELL_ICON)
+    icon:SetPoint("LEFT", row, "LEFT", 0, 0)
+    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    icon:SetTexture((spellId and spellId > 0 and GetSpellTexture(spellId))
+        or "Interface\\Icons\\INV_Misc_QuestionMark")
+
+    local lbl = MakeFont(row, 11, "LEFT")
+    lbl:SetPoint("LEFT", row, "LEFT", SPELL_ICON + 4, 0)
+    lbl:SetWidth(DETAIL_W * 0.55 - SPELL_ICON - 4)
+    lbl:SetText(name or "")
+    lbl:SetTextColor(lr or C_TEXT[1], lg or C_TEXT[2], lb or C_TEXT[3])
+
+    local val = MakeFont(row, 11, "RIGHT")
+    val:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+    val:SetWidth(DETAIL_W * 0.44)
+    val:SetText(rightText or "")
+    val:SetTextColor(rr or C_TEXT[1], rg or C_TEXT[2], rb or C_TEXT[3])
+
+    row:Show()
+    detailRows[#detailRows + 1] = row
+    return row
+end
+
 local function RenderDetail(session)
     ClearDetailPanel()
     if not session then
@@ -344,10 +377,11 @@ local function RenderDetail(session)
         local pctVal = attempts > 0 and (entry.hits / attempts) or 0
         local pr, pg, pb = unpack(pctVal >= 0.75 and C_GOOD or (pctVal >= 0.50 and C_WARN or C_BAD))
 
-        AddDetailRow(detailPanel, yOfs, "  " .. sd.name,
+        AddSpellRow(detailPanel, yOfs, entry.spellId,
+            CCTracker:GetSpellDisplayName(entry.spellId, sd.name),
             string.format("%s  (%d / %d)", pct, entry.hits, attempts),
             C_TEXT[1], C_TEXT[2], C_TEXT[3], pr, pg, pb)
-        yOfs = yOfs - 18
+        yOfs = yOfs - SPELL_ROW_H
 
         -- Miss breakdown
         local hasMiss = false
@@ -439,10 +473,11 @@ local function RenderDetail(session)
         -- higher avoid% is better (green)
         local pr, pg, pb = unpack(avoidVal >= 0.5 and C_GOOD or (avoidVal >= 0.25 and C_WARN or C_BAD))
 
-        AddDetailRow(detailPanel, yOfs, "  " .. sd.name,
+        AddSpellRow(detailPanel, yOfs, entry.spellId,
+            CCTracker:GetSpellDisplayName(entry.spellId, sd.name),
             string.format("%s  (%d / %d)", avoidPct, avoided, attempts),
             C_TEXT[1], C_TEXT[2], C_TEXT[3], pr, pg, pb)
-        yOfs = yOfs - 18
+        yOfs = yOfs - SPELL_ROW_H
 
         -- Avoid type breakdown
         local hasAvoid = false
@@ -532,10 +567,13 @@ local function GetOrCreateEntry(index)
     selTex:Hide()
     btn.selTex = selTex
 
-    -- Hover
-    local hlTex = btn:CreateTexture(nil, "HIGHLIGHT")
+    -- Hover highlight — manual show/hide avoids the default bright-green button glow
+    local hlTex = btn:CreateTexture(nil, "ARTWORK")
     hlTex:SetAllPoints()
-    hlTex:SetTexture(1, 1, 1, 0.08)
+    hlTex:SetTexture("Interface\\BUTTONS\\WHITE8X8")
+    hlTex:SetVertexColor(0.75, 0.75, 0.75, 0.18)
+    hlTex:Hide()
+    btn.hlTex = hlTex
 
     -- Type icon area (coloured badge)
     local badge = btn:CreateTexture(nil, "ARTWORK")
@@ -543,15 +581,15 @@ local function GetOrCreateEntry(index)
     badge:SetPoint("LEFT", btn, "LEFT", 4, 0)
     btn.badge = badge
 
-    -- Text lines
+    -- Text lines — offset by 3 more px to centre in the taller row
     local topLine = MakeFont(btn, 11, "LEFT")
-    topLine:SetPoint("TOPLEFT",  btn, "TOPLEFT",  16, -4)
-    topLine:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -4, -4)
+    topLine:SetPoint("TOPLEFT",  btn, "TOPLEFT",  16, -7)
+    topLine:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -4, -7)
     btn.topLine = topLine
 
     local botLine = MakeFont(btn, 10, "LEFT")
-    botLine:SetPoint("TOPLEFT",  btn, "TOPLEFT",  16, -17)
-    botLine:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -4, -17)
+    botLine:SetPoint("TOPLEFT",  btn, "TOPLEFT",  16, -20)
+    botLine:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -4, -20)
     botLine:SetTextColor(C_NEUTRAL[1], C_NEUTRAL[2], C_NEUTRAL[3])
     btn.botLine = botLine
 
@@ -561,6 +599,8 @@ local function GetOrCreateEntry(index)
         CCTracker_History:RefreshList()
         RenderDetail(filteredSessions[selectedIndex])
     end)
+    btn:SetScript("OnEnter", function(self) self.hlTex:Show() end)
+    btn:SetScript("OnLeave", function(self) self.hlTex:Hide() end)
 
     entryButtons[index] = btn
     return btn
@@ -602,7 +642,7 @@ function CCTracker_History:RefreshList()
             totalAvoided = totalAvoided + (att - e.received)
         end
 
-        local startClock = date("%Y-%m-%d %H:%M", session.startTime)
+        local startClock = date("%H:%M", session.startTime)
         btn.topLine:SetText(string.format("%s  |  %s", typeName, session.name))
         btn.botLine:SetText(string.format("%s  •  %s  •  Out: %d/%d (%s)  In: %d/%d avd",
             startClock, duration, totalHits, totalAtt, pct, totalAvoided, totalInAtt))

@@ -263,6 +263,15 @@ function CCTracker:SortCCSpellList(list, isIncoming)
     end)
 end
 
+-- Returns the client-localized spell name for spellId, or fallback if unavailable.
+function CCTracker:GetSpellDisplayName(spellId, fallback)
+    if spellId and spellId > 0 then
+        local name = GetSpellInfo(spellId)
+        if name and name ~= "" then return name end
+    end
+    return fallback
+end
+
 -- Returns the current character key "Name-Realm".
 function CCTracker:GetCharKey()
     return charKey or (UnitName("player") .. "-" .. GetRealmName())

@@ -400,13 +400,14 @@ function CCTracker_Widget:Refresh()
             local attempts = CCTracker:GetSpellAttempts(entry)
             local pctVal   = attempts > 0 and (entry.hits / attempts) or 0
 
+            local displayName = CCTracker:GetSpellDisplayName(entry.spellId, sd.name)
             row.icon:SetTexture(GetSpellTexture(entry.spellId) or "Interface\\Icons\\INV_Misc_QuestionMark")
             row.name:SetWidth(nameW)
-            row.name:SetText(sd.name)
+            row.name:SetText(displayName)
             row.tries:SetText("(" .. attempts .. ")")
             row.pct:SetText(CCTracker:FormatHitPct(entry.hits, attempts))
             ColourPct(row.pct, pctVal)
-            row.spellName = sd.name
+            row.spellName = displayName
             row.entry     = entry
 
             row:ClearAllPoints()
@@ -463,13 +464,14 @@ function CCTracker_Widget:Refresh()
             local avoided  = attempts - entry.received
             local pctVal   = attempts > 0 and (avoided / attempts) or 0
 
+            local displayName = CCTracker:GetSpellDisplayName(entry.spellId, sd.name)
             row.icon:SetTexture(GetSpellTexture(entry.spellId) or "Interface\\Icons\\INV_Misc_QuestionMark")
             row.name:SetWidth(nameW)
-            row.name:SetText(sd.name)
+            row.name:SetText(displayName)
             row.tries:SetText("(" .. attempts .. ")")
             row.pct:SetText(CCTracker:FormatHitPct(avoided, attempts))
             ColourPct(row.pct, pctVal)
-            row.spellName = sd.name
+            row.spellName = displayName
             row.entry     = entry
 
             row:ClearAllPoints()
