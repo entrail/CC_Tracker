@@ -83,16 +83,24 @@ local DIFF_SUFFIX = {
 
 -- Attempt to distinguish rated arenas from skirmishes via GetBattlefieldInfo.
 -- Returns "arena_rated", "arena_skirmish", or "arena" (fallback if detection fails).
--- GetBattlefieldInfo(i) in TBC returns:
---   name, canQueue, status, minLevel, maxLevel, numGroupMembersQueued, isRated
+-- Wrapped in pcall because GetBattlefieldInfo can throw a Lua error in TBC
+-- Anniversary when called from inside an arena instance.
 local function DetectArenaType()
-    for i = 1, 10 do
-        local name, _, status, _, _, _, isRated = GetBattlefieldInfo(i)
-        if name and (status == "active" or status == "confirm") then
-            return isRated and "arena_rated" or "arena_skirmish"
+    local ok, result = pcall(function()
+        for i = 1, 10 do
+            local name, _, status, _, _, _, isRated = GetBattlefieldInfo(i)
+            if name and (status == "active" or status == "confirm") then
+                return isRated and "arena_rated" or "arena_skirmish"
+            end
         end
+        return "arena"
+    end)
+    if ok then
+        return result or "arena"
+    else
+        CCTracker.Log("DetectArenaType: GetBattlefieldInfo error: " .. tostring(result))
+        return "arena"
     end
-    return "arena"  -- fallback when GetBattlefieldInfo cannot determine the type
 end
 
 local function StartSession(instanceType, mapID, difficultyID)
@@ -282,6 +290,12 @@ function CCTracker_Session:OnBGSystemMsg(msg)
         -- Arena combat officially started; session should already be open from PLAYER_ENTERING_WORLD.
         local current = CCTrackerDB.currentSession
         local t = current and current.type
+        local _, iType, _, _, _, _, _, iMapID = GetInstanceInfo()
+        CCTracker.Log(string.format(
+            "ARENA_START_MSG: session=%s iType=%s mapID=%s timerActive=%s",
+            current and (t.."/"..current.name) or "NIL",
+            tostring(iType), tostring(iMapID),
+            tostring(arenaEndSession ~= nil)))
         if current and (t == "arena" or t == "arena_rated" or t == "arena_skirmish") then
             -- Re-detect rated/skirmish now that the match is live (more reliable than at load-in).
             local detected = DetectArenaType()

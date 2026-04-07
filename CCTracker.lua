@@ -371,6 +371,24 @@ local function OnCombatLog()
     local spellData = CCTracker_CCSpells[canonicalName]
     if not spellData then return end
 
+    -- Log every CC spell event for diagnosis (visible only when debug is ON).
+    do
+        local isPlayerSrc  = (sourceGUID == playerGUID)
+        local isPetSrc     = (petGUID and sourceGUID == petGUID) and true or false
+        local flagsHex     = destFlags and string.format("0x%08X", destFlags) or "nil"
+        local hostileOk    = destFlags and (bit.band(destFlags, HOSTILE_FLAG)  > 0) or false
+        local outsiderOk   = destFlags and (bit.band(destFlags, OUTSIDER_FLAG) > 0) or false
+        local sessionState = CCTrackerDB.currentSession
+            and (CCTrackerDB.currentSession.type .. "/" .. CCTrackerDB.currentSession.name)
+            or "NIL"
+        CCTracker.Log(string.format(
+            "CC-EVENT: %s spell=%s(%d) src=%s dst=%s flags=%s hostile=%s outsider=%s playerSrc=%s petSrc=%s session=%s",
+            tostring(subevent), tostring(canonicalName), tostring(spellId or 0),
+            tostring(sourceGUID), tostring(destGUID),
+            flagsHex, tostring(hostileOk), tostring(outsiderOk),
+            tostring(isPlayerSrc), tostring(isPetSrc), sessionState))
+    end
+
     -- If PLAYER_ENTERING_WORLD fired before GetInstanceInfo() was ready, no session
     -- was created.  The first relevant CC spell we see is a reliable signal that we're
     -- inside an instance — create the session now if we still don't have one.
@@ -459,8 +477,12 @@ frame:SetScript("OnEvent", function(self, event, ...)
         playerGUID = playerGUID or UnitGUID("player")
         petGUID    = UnitGUID("pet")
         CCTracker.enemyBuffs = {}
-        local _, iType = GetInstanceInfo()
-        CCTracker.Log("PLAYER_ENTERING_WORLD. instanceType=" .. tostring(iType) .. " zone=" .. tostring(GetZoneText()))
+        local iName, iType, diffID, _, _, _, _, mapID = GetInstanceInfo()
+        CCTracker.Log(string.format(
+            "PLAYER_ENTERING_WORLD: iType=%s iName=%s mapID=%s diffID=%s zone=%s subzone=%s session=%s",
+            tostring(iType), tostring(iName), tostring(mapID), tostring(diffID),
+            tostring(GetZoneText()), tostring(GetSubZoneText()),
+            CCTrackerDB.currentSession and (CCTrackerDB.currentSession.type.."/"..CCTrackerDB.currentSession.name) or "nil"))
         CCTracker_Session:OnEnterWorld()
 
     elseif event == "UNIT_PET" then
@@ -471,7 +493,12 @@ frame:SetScript("OnEvent", function(self, event, ...)
         end
 
     elseif event == "ZONE_CHANGED_NEW_AREA" then
-        CCTracker.Log("ZONE_CHANGED -> " .. tostring(GetZoneText()) .. " / " .. tostring(GetSubZoneText()))
+        local _, zcType, _, _, _, _, _, zcMapID = GetInstanceInfo()
+        CCTracker.Log(string.format(
+            "ZONE_CHANGED_NEW_AREA: iType=%s mapID=%s zone=%s subzone=%s session=%s",
+            tostring(zcType), tostring(zcMapID),
+            tostring(GetZoneText()), tostring(GetSubZoneText()),
+            CCTrackerDB.currentSession and (CCTrackerDB.currentSession.type.."/"..CCTrackerDB.currentSession.name) or "nil"))
         CCTracker_Session:OnZoneChanged()
 
     elseif event == "UPDATE_BATTLEFIELD_STATUS" then
