@@ -17,6 +17,7 @@ CCTracker_CCSpells = {
     ["Counterspell"]        = { ccType = "interrupt",  ccLevel = "medium", label = "Counterspell" },
     ["Cone of Cold"]        = { ccType = "aura",      ccLevel = "light",  label = "Cone of Cold" },
     ["Slow"]                = { ccType = "aura",      ccLevel = "light",  label = "Slow" },
+    ["Frostbolt"]           = { ccType = "aura",      ccLevel = "light",  label = "Frostbolt" },            -- 40% movement slow debuff applied on hit
     -- Mage Water Elemental (pet) ability
     ["Freeze"]              = { ccType = "aura",      ccLevel = "medium", label = "Freeze" },            -- Water Elemental pet: AoE root, different spell from the mage's own Frost Nova
     -- Mage talent procs
@@ -29,10 +30,14 @@ CCTracker_CCSpells = {
     ["Cheap Shot"]          = { ccType = "aura",      ccLevel = "hard",   label = "Cheap Shot" },
     ["Gouge"]               = { ccType = "aura",      ccLevel = "hard",   label = "Gouge" },
     ["Kick"]                = { ccType = "interrupt",  ccLevel = "medium", label = "Kick" },
+    -- Rogue poisons
+    ["Crippling Poison"]    = { ccType = "aura",      ccLevel = "light",  label = "Crippling Poison" },    -- 70% movement slow
+    ["Mind-numbing Poison"] = { ccType = "aura",      ccLevel = "light",  label = "Mind-numbing" },        -- 50% cast time increase
+    ["Wound Poison"]        = { ccType = "aura",      ccLevel = "light",  label = "Wound Poison" },        -- 50% healing reduction
     -- Rogue talent procs  (Mace Stun Effect is shared with Warrior — see WARRIOR section)
     -- DRUID
     ["Hibernate"]           = { ccType = "aura",      ccLevel = "hard",   label = "Hibernate" },
-    ["Cyclone"]             = { ccType = "aura",      ccLevel = "hard",   label = "Cyclone" },
+    ["Cyclone"]             = { ccType = "aura",      ccLevel = "hard",   label = "Cyclone",           ids = {33786} },
     ["Bash"]                = { ccType = "aura",      ccLevel = "hard",   label = "Bash" },
     ["Maim"]                = { ccType = "aura",      ccLevel = "hard",   label = "Maim" },
     ["Pounce"]              = { ccType = "aura",      ccLevel = "hard",   label = "Pounce" },
@@ -54,8 +59,9 @@ CCTracker_CCSpells = {
     ["Seduction"]           = { ccType = "aura",      ccLevel = "hard",   label = "Seduction" },       -- Succubus (pet)
     ["Spell Lock"]          = { ccType = "interrupt",  ccLevel = "medium", label = "Spell Lock" },      -- Felhunter (pet)
     ["Curse of Exhaustion"] = { ccType = "aura",      ccLevel = "light",  label = "Curse of Exhaustion" },
+    ["Curse of Tongues"]    = { ccType = "aura",      ccLevel = "light",  label = "Curse of Tongues" },    -- 50% cast time increase
     -- HUNTER
-    ["Scatter Shot"]        = { ccType = "aura",      ccLevel = "hard",   label = "Scatter Shot" },
+    ["Scatter Shot"]        = { ccType = "aura",      ccLevel = "hard",   label = "Scatter Shot",      ids = {19503} },
     ["Wyvern Sting"]        = { ccType = "aura",      ccLevel = "hard",   label = "Wyvern Sting" },
     ["Freezing Trap Effect"]= { ccType = "aura",      ccLevel = "hard",   label = "Freezing Trap" },
     ["Scare Beast"]         = { ccType = "aura",      ccLevel = "hard",   label = "Scare Beast" },
@@ -67,25 +73,28 @@ CCTracker_CCSpells = {
     ["Counterattack"]       = { ccType = "aura",      ccLevel = "medium", label = "Counterattack" },     -- Survival talent: melee attack after dodging that roots the target for 5s
     -- PALADIN
     ["Hammer of Justice"]   = { ccType = "aura",      ccLevel = "hard",   label = "Hammer of Justice" },
-    ["Repentance"]          = { ccType = "aura",      ccLevel = "hard",   label = "Repentance" },
+    ["Repentance"]          = { ccType = "aura",      ccLevel = "hard",   label = "Repentance",        ids = {20066} },
     ["Turn Evil"]           = { ccType = "aura",      ccLevel = "hard",   label = "Turn Evil" },
     ["Avenger's Shield"]    = { ccType = "aura",      ccLevel = "medium", label = "Avenger's Shield" },
+    ["Judgement of Justice"] = { ccType = "aura",     ccLevel = "light",  label = "Judge. Justice" },      -- prevents fleeing / movement cap
     -- SHAMAN
     ["Earth Shock"]         = { ccType = "interrupt",  ccLevel = "medium", label = "Earth Shock" },
     ["Frost Shock"]         = { ccType = "aura",      ccLevel = "light",  label = "Frost Shock" },
+    ["Frostbrand Attack"]   = { ccType = "aura",      ccLevel = "light",  label = "Frostbrand" },          -- movement slow from Frostbrand Weapon on-hit proc
+    -- ["Earthbind Totem"]  -- NOT TRACKABLE: totem applies its slow as a passive zone effect, no combat log event fires
     -- WARRIOR
-    ["Intimidating Shout"]  = { ccType = "aura",      ccLevel = "hard",   label = "Intimidating Shout" },
+    ["Intimidating Shout"]  = { ccType = "aura",      ccLevel = "hard",   label = "Intimidating Shout", ids = {5246} },
     ["Charge"]              = { ccType = "aura",      ccLevel = "hard",   label = "Charge" },
     ["Intercept"]           = { ccType = "aura",      ccLevel = "hard",   label = "Intercept" },
-    ["Concussion Blow"]     = { ccType = "aura",      ccLevel = "hard",   label = "Concussion Blow" },
+    ["Concussion Blow"]     = { ccType = "aura",      ccLevel = "hard",   label = "Concussion Blow",   ids = {12809} },
     ["Pummel"]              = { ccType = "interrupt",  ccLevel = "medium", label = "Pummel" },
     ["Shield Bash"]         = { ccType = "interrupt",  ccLevel = "medium", label = "Shield Bash" },
     ["Hamstring"]           = { ccType = "aura",      ccLevel = "light",  label = "Hamstring" },
-    ["Piercing Howl"]       = { ccType = "aura",      ccLevel = "light",  label = "Piercing Howl" },
+    ["Piercing Howl"]       = { ccType = "aura",      ccLevel = "light",  label = "Piercing Howl",     ids = {12323} },
     -- Warrior/Rogue talent procs
     ["Mace Stun Effect"]    = { ccType = "aura",      ccLevel = "hard",   label = "Mace Stun" },         -- Mace Specialization: mace attacks have a 3% chance to stun for 3s (Warrior Arms & Rogue Combat)
     -- RACIAL
-    ["War Stomp"]           = { ccType = "aura",      ccLevel = "hard",   label = "War Stomp" },        -- Tauren
+    ["War Stomp"]           = { ccType = "aura",      ccLevel = "hard",   label = "War Stomp",         ids = {20549} },  -- Tauren
     ["Arcane Torrent"]      = { ccType = "aura",      ccLevel = "medium", label = "Arcane Torrent" },   -- Blood Elf
     -- WEAPON ON-HIT PROCS
     -- These fire from the player's weapon and appear in the combat log with the player as source,
@@ -94,6 +103,23 @@ CCTracker_CCSpells = {
     ["The Unstoppable Force"] = { ccType = "aura",    ccLevel = "hard",   label = "Unstop. Force" },    -- Darkmoon Faire 2H mace: on-hit stun for 3s
     ["Thunderfury"]         = { ccType = "aura",      ccLevel = "light",  label = "Thunderfury" },      -- Thunderfury legendary 1H sword: on-hit movement/attack speed slow
 }
+
+-- Reverse-lookup: spellId → canonical English spell name.
+-- Built automatically from entries that carry an `ids` array.
+-- In OnCombatLog the spellId is checked here FIRST; if found the canonical name
+-- is used for recording regardless of the client's display language.
+-- To add a spell: append  ids = {id1, id2, ...}  to its entry above.
+-- Use /cct debug then cast the spell near an enemy to see the spellId in chat.
+CCTracker_CCSpellsByID = {}
+do
+    for name, data in pairs(CCTracker_CCSpells) do
+        if data.ids then
+            for _, id in ipairs(data.ids) do
+                CCTracker_CCSpellsByID[id] = name
+            end
+        end
+    end
+end
 
 -- Sort priority for CC levels (lower = higher priority / shown first)
 CCTracker_CCLevelOrder = { hard = 1, medium = 2, light = 3 }

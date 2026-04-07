@@ -3,7 +3,10 @@
 
 CCTracker_Widget = {}
 
-local WIDGET_WIDTH  = 280
+local WIDGET_WIDTH  = 280   -- default / initial width
+local WIDGET_MIN_W  = 200   -- minimum allowed width when resizing
+local WIDGET_MAX_W  = 600   -- maximum allowed width when resizing
+local WIDGET_MIN_H  = 130   -- ← adjust this line to change the minimum height
 local ROW_HEIGHT    = 22
 local HEADER_HEIGHT = 28
 local SECTION_H     = 16   -- section label height
@@ -11,6 +14,10 @@ local COL_H         = 14   -- column-header label height
 local PADDING       = 8
 local MAX_ROWS      = 10
 local ICON_SIZE     = 16
+-- Fixed horizontal space consumed by the icon + right-side columns (used to derive the
+-- adaptive spell-name column width from the current widget width).
+-- = PADDING(left) + ICON_SIZE + icon_gap(5) + PADDING(right) + tries(52) + gap(4) + pct(52)
+local NAME_COL_RESERVED = PADDING + ICON_SIZE + 5 + PADDING + 52 + 4 + 52  -- 145
 
 local C_TITLE   = { 1,    0.82, 0 }
 local C_HEADER  = { 0.6,  0.6,  0.6 }
@@ -154,6 +161,7 @@ local function BuildWidget()
     f:SetFrameStrata("MEDIUM")
     f:SetClampedToScreen(true)
     f:SetMovable(true)
+    f:SetResizable(true)
     f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")
 
@@ -174,25 +182,33 @@ local function BuildWidget()
         CCTrackerDB.settings.widgetY        = y
     end)
 
-    -- Title bar
-    local titleBg = f:CreateTexture(nil, "BACKGROUND")
-    titleBg:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-    titleBg:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-    titleBg:SetHeight(HEADER_HEIGHT)
-    titleBg:SetTexture("Interface\\BUTTONS\\WHITE8X8")
-    titleBg:SetVertexColor(0, 0, 0, 0.4)
+    -- ── Resize grip (bottom-right corner) ────────────────────────────────────
+    local grip = CreateFrame("Frame", nil, f)
+    grip:SetSize(16, 16)
+    grip:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
+    grip:SetFrameLevel(f:GetFrameLevel() + 2)
+    grip:EnableMouse(true)
 
-    local titleText = MakeFont(f, 12, "LEFT")
-    titleText:SetPoint("TOPLEFT",     titleBg, "TOPLEFT",     PADDING, 0)
-    titleText:SetPoint("BOTTOMRIGHT", titleBg, "BOTTOMRIGHT", -22,     0)
-    titleText:SetTextColor(unpack(C_TITLE))
-    f.titleText = titleText
+    local gripTex = grip:CreateTexture(nil, "OVERLAY")
+    gripTex:SetAllPoints()
+    gripTex:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
 
-    -- Close button
-    local closeBtn = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-    closeBtn:SetSize(20, 20)
-    closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", 2, 2)
-    closeBtn:SetScript("OnClick", function() f:Hide() end)
+    grip:SetScript("OnEnter", function()
+        gripTex:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Over")
+    end)
+    grip:SetScript("OnLeave", function()
+        gripTex:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+    end)
+    grip:SetScript("OnMouseDown", function(_, btn)
+        if btn == "LeftButton" then f:StartSizing("RIGHT") end
+    end)
+    grip:SetScript("OnMouseUp", function()
+        f:StopMovingOrSizing()
+        -- Clamp width to allowed range, then re-layout (Refresh enforces WIDGET_MIN_H).
+        local w = math.max(WIDGET_MIN_W, math.min(WIDGET_MAX_W, f:GetWidth()))
+        CCTrackerDB.settings.widgetWidth = w
+        CCTracker_Widget:Refresh()
+    end)
 
     -- ── Outgoing section ─────────────────────────────────────────────────────
     local outLabel = MakeFont(f, 11, "LEFT")
@@ -322,14 +338,6 @@ function CCTracker_Widget:Refresh()
 
     local isActive = (session == CCTrackerDB.currentSession) and session ~= nil
 
-    -- Title
-    if session then
-        local typeName = CCTracker_SessionTypeNames[session.type] or session.type
-        f.titleText:SetText("CCTracker  |  " .. typeName .. (isActive and "" or " (ended)"))
-    else
-        f.titleText:SetText("CCTracker")
-    end
-
     -- ── Build sorted spell lists ──────────────────────────────────────────────
     local outList, inList = {}, {}
     if session then
@@ -345,12 +353,15 @@ function CCTracker_Widget:Refresh()
     local outCount = math.min(#outList, MAX_ROWS)
     local inCount  = math.min(#inList,  MAX_ROWS)
 
+    -- Adaptive spell-name column width — grows and shrinks with the widget.
+    local nameW = math.max(60, f:GetWidth() - NAME_COL_RESERVED)
+
     -- Hide all previously active rows
     for _, r in ipairs(outRows) do r:Hide() end
     for _, r in ipairs(inRows)  do r:Hide() end
 
     -- ── Layout engine — running y from top ───────────────────────────────────
-    local y = -HEADER_HEIGHT - 6   -- start just below title bar
+    local y = -PADDING   -- start at top with just a small padding gap
 
     -- ── OUTGOING SECTION ─────────────────────────────────────────────────────
     -- Section label
@@ -390,6 +401,7 @@ function CCTracker_Widget:Refresh()
             local pctVal   = attempts > 0 and (entry.hits / attempts) or 0
 
             row.icon:SetTexture(GetSpellTexture(entry.spellId) or "Interface\\Icons\\INV_Misc_QuestionMark")
+            row.name:SetWidth(nameW)
             row.name:SetText(sd.name)
             row.tries:SetText("(" .. attempts .. ")")
             row.pct:SetText(CCTracker:FormatHitPct(entry.hits, attempts))
@@ -452,6 +464,7 @@ function CCTracker_Widget:Refresh()
             local pctVal   = attempts > 0 and (avoided / attempts) or 0
 
             row.icon:SetTexture(GetSpellTexture(entry.spellId) or "Interface\\Icons\\INV_Misc_QuestionMark")
+            row.name:SetWidth(nameW)
             row.name:SetText(sd.name)
             row.tries:SetText("(" .. attempts .. ")")
             row.pct:SetText(CCTracker:FormatHitPct(avoided, attempts))
@@ -499,7 +512,9 @@ function CCTracker_Widget:Refresh()
     f.footerText:SetPoint("RIGHT",  f, "RIGHT", -PADDING, 0)
 
     y = y - PADDING
-    f:SetSize(WIDGET_WIDTH, math.abs(y))
+    -- Preserve the current (possibly resized) width; height snaps to content but
+    -- never below WIDGET_MIN_H (adjust that constant at the top of this file).
+    f:SetSize(f:GetWidth(), math.max(WIDGET_MIN_H, math.abs(y)))
 end
 
 -- ─── Initialise ──────────────────────────────────────────────────────────────
@@ -522,7 +537,8 @@ initFrame:SetScript("OnEvent", function()
             f:SetPoint("CENTER", UIParent, "CENTER", 300, 0)
         end
 
-        f:SetSize(WIDGET_WIDTH, 80)
+        local savedW = (s.widgetWidth and s.widgetWidth >= WIDGET_MIN_W) and s.widgetWidth or WIDGET_WIDTH
+        f:SetSize(savedW, 80)
         f:Show()
         CCTracker_Widget:Refresh()
     end)

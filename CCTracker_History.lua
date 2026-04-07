@@ -104,6 +104,14 @@ end
 local typeDropdown   = nil
 local typeCheckboxes = {}
 
+local function SaveFilterTypes()
+    if CCTrackerDB and CCTrackerDB.settings then
+        local hf = CCTrackerDB.settings.historyFilter or {}
+        CCTrackerDB.settings.historyFilter = hf
+        for k, v in pairs(filterTypes) do hf[k] = v end
+    end
+end
+
 local function GetDateOptions()
     local today     = date("%Y-%m-%d")
     local yesterday = date("%Y-%m-%d", time() - 86400)
@@ -683,6 +691,14 @@ local function BuildHistory()
         return
     end
 
+    -- Restore persisted filter state (all-true by default on first load)
+    local saved = CCTrackerDB and CCTrackerDB.settings and CCTrackerDB.settings.historyFilter
+    if saved then
+        for k in pairs(filterTypes) do
+            if saved[k] ~= nil then filterTypes[k] = saved[k] end
+        end
+    end
+
     -- ── Main frame (fully manual — no UIPanelDialogTemplate) ────────────────
     local f = CreateFrame("Frame", "CCTrackerHistoryFrame", UIParent)
     f:SetSize(WIN_W, WIN_H)
@@ -806,6 +822,7 @@ local function BuildHistory()
             end
             typeBtn:SetText(GetTypeSummary())
             selectedIndex = nil
+            SaveFilterTypes()
             CCTracker_History:RebuildList()
         end)
     end
@@ -835,6 +852,7 @@ local function BuildHistory()
             filterTypes[self.typeKey] = self:GetChecked() and true or false
             typeBtn:SetText(GetTypeSummary())
             selectedIndex = nil
+            SaveFilterTypes()
             CCTracker_History:RebuildList()
         end)
         typeCheckboxes[#typeCheckboxes + 1] = cb
@@ -902,6 +920,7 @@ local function BuildHistory()
         end
         dateBtn:SetText("All Dates")
         charBtn:SetText("My Char")
+        SaveFilterTypes()
         selectedIndex = nil
         CCTracker_History:RebuildList()
     end)

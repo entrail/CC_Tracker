@@ -6,6 +6,7 @@ CCTracker = {}
 -- Upvalues
 local playerGUID
 local petGUID       -- player's active pet (Succubus, Felhunter, Hunter pet, etc.)
+local totemGUIDs = {}  -- GUIDs of the player's active totems (cleared on UNIT_DIED/zone change)
 local charKey       -- "CharName-Realm", used to tag sessions per character
 local HOSTILE_FLAG = COMBATLOG_OBJECT_REACTION_HOSTILE or 0x00000040
 
@@ -85,6 +86,17 @@ local function InitDB()
     for k, v in pairs(trackDefaults) do
         if CCTrackerDB.settings.track[k] == nil then
             CCTrackerDB.settings.track[k] = v
+        end
+    end
+    -- History window type-filter state (all enabled by default)
+    CCTrackerDB.settings.historyFilter = CCTrackerDB.settings.historyFilter or {}
+    local historyFilterDefaults = {
+        arena_rated = true, arena_skirmish = true,
+        pvp = true, party = true, raid = true, world = true,
+    }
+    for k, v in pairs(historyFilterDefaults) do
+        if CCTrackerDB.settings.historyFilter[k] == nil then
+            CCTrackerDB.settings.historyFilter[k] = v
         end
     end
     -- Close any orphaned session from a previous crash/logout.
@@ -335,12 +347,24 @@ end
 local function OnCombatLog()
     local _, subevent, _,
         sourceGUID, _, _, _,
-        destGUID, _, destFlags, _,
+        destGUID, destName, destFlags, _,
         spellId, spellName, _, p15 = CombatLogGetCurrentEventInfo()
 
-    -- Clear buff table when a unit dies
+    -- Clear buff table when a unit dies; also remove from totem set if relevant
     if subevent == "UNIT_DIED" or subevent == "UNIT_DESTROYED" then
         CCTracker.enemyBuffs[destGUID] = nil
+        totemGUIDs[destGUID] = nil
+        return
+    end
+
+    -- Register totems summoned by the player so their SPELL_AURA_APPLIED events
+    -- are attributed to the player (totems appear as their own GUID in the combat log).
+    -- SPELL_CREATE is checked too in case the client uses it for totem objects.
+    if (subevent == "SPELL_SUMMON" or subevent == "SPELL_CREATE") and sourceGUID == playerGUID then
+        if destName and destName:find("Totem", 1, true) then
+            totemGUIDs[destGUID] = true
+            CCTracker.Log("Totem registered: " .. destName .. " guid=" .. tostring(destGUID))
+        end
         return
     end
 
@@ -357,7 +381,9 @@ local function OnCombatLog()
     end
 
     if not spellName then return end
-    local spellData = CCTracker_CCSpells[spellName]
+    -- Prefer spell-ID lookup (language-independent); fall back to spell name.
+    local canonicalName = (spellId and CCTracker_CCSpellsByID[spellId]) or spellName
+    local spellData = CCTracker_CCSpells[canonicalName]
     if not spellData then return end
 
     -- If PLAYER_ENTERING_WORLD fired before GetInstanceInfo() was ready, no session
@@ -368,23 +394,23 @@ local function OnCombatLog()
         if not CCTrackerDB.currentSession then return end   -- open world, skip
     end
 
-    -- ── Outgoing: player (or player's pet) cast on an enemy ──────────────────
-    if (sourceGUID == playerGUID or (petGUID and sourceGUID == petGUID))
+    -- ── Outgoing: player (or player's pet/totem) cast on an enemy ────────────
+    if (sourceGUID == playerGUID or (petGUID and sourceGUID == petGUID) or totemGUIDs[sourceGUID])
     and destFlags and bit.band(destFlags, HOSTILE_FLAG) > 0 then
 
         if spellData.ccType == "aura" then
             if (subevent == "SPELL_AURA_APPLIED" or subevent == "SPELL_AURA_REFRESH")
             and p15 == "DEBUFF" then
-                CCTracker:RecordHit(spellName, spellId)
+                CCTracker:RecordHit(canonicalName, spellId)
             elseif subevent == "SPELL_MISSED" then
-                CCTracker:RecordMiss(spellName, spellId, p15, destGUID)
+                CCTracker:RecordMiss(canonicalName, spellId, p15, destGUID)
             end
 
         elseif spellData.ccType == "interrupt" then
             if subevent == "SPELL_INTERRUPT" then
-                CCTracker:RecordHit(spellName, spellId)
+                CCTracker:RecordHit(canonicalName, spellId)
             elseif subevent == "SPELL_MISSED" then
-                CCTracker:RecordMiss(spellName, spellId, p15, destGUID)
+                CCTracker:RecordMiss(canonicalName, spellId, p15, destGUID)
             end
         end
     end
@@ -395,17 +421,17 @@ local function OnCombatLog()
         if spellData.ccType == "aura" then
             if (subevent == "SPELL_AURA_APPLIED" or subevent == "SPELL_AURA_REFRESH")
             and p15 == "DEBUFF" then
-                CCTracker:RecordIncomingHit(spellName, spellId)
+                CCTracker:RecordIncomingHit(canonicalName, spellId)
             elseif subevent == "SPELL_MISSED" then
                 -- p15 = missType — why the CC failed to land on the player
-                CCTracker:RecordIncomingMiss(spellName, spellId, p15)
+                CCTracker:RecordIncomingMiss(canonicalName, spellId, p15)
             end
 
         elseif spellData.ccType == "interrupt" then
             if subevent == "SPELL_INTERRUPT" then
-                CCTracker:RecordIncomingHit(spellName, spellId)
+                CCTracker:RecordIncomingHit(canonicalName, spellId)
             elseif subevent == "SPELL_MISSED" then
-                CCTracker:RecordIncomingMiss(spellName, spellId, p15)
+                CCTracker:RecordIncomingMiss(canonicalName, spellId, p15)
             end
         end
     end
@@ -441,6 +467,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
     elseif event == "PLAYER_ENTERING_WORLD" then
         playerGUID = playerGUID or UnitGUID("player")
         petGUID    = UnitGUID("pet")
+        totemGUIDs = {}
         CCTracker.enemyBuffs = {}
         local _, iType = GetInstanceInfo()
         CCTracker.Log("PLAYER_ENTERING_WORLD. instanceType=" .. tostring(iType) .. " zone=" .. tostring(GetZoneText()))
@@ -542,6 +569,8 @@ SlashCmdList["CCTRACKER"] = function(msg)
             CCTrackerDB.settings.widgetY        = nil
             CCTrackerDB.settings.widgetPoint    = nil
             CCTrackerDB.settings.widgetRelPoint = nil
+            CCTrackerDB.settings.widgetWidth    = nil
+            w:SetWidth(280)   -- back to default width
             w:Show()
             CCTracker_Widget:Refresh()
             print("|cff00ff00[CCTracker]|r Widget position reset.")
