@@ -11,4 +11,3 @@ CCTracker_Session.lua
 CCTracker_Minimap.lua
 CCTracker_Widget.lua
 CCTracker_History.lua
-CCTracker_Options.lua

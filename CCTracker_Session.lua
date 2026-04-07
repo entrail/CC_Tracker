@@ -62,25 +62,6 @@ local function StartSession(instanceType, mapID, difficultyID)
         sessionType = DetectArenaType()
     end
 
-    -- Respect the per-type tracking toggles set in the options panel.
-    -- "arena" is the fallback when rated/skirmish cannot be detected yet;
-    -- allow it if either arena sub-type is enabled.
-    do
-        local track = CCTrackerDB.settings and CCTrackerDB.settings.track
-        if track then
-            local enabled
-            if sessionType == "arena" then
-                enabled = track.arena_rated ~= false or track.arena_skirmish ~= false
-            else
-                enabled = track[sessionType] ~= false
-            end
-            if not enabled then
-                CCTracker.Log("StartSession: type=" .. tostring(sessionType) .. " disabled in options — skipping")
-                return
-            end
-        end
-    end
-
     local session = {
         id           = NewSessionId(),
         type         = sessionType,

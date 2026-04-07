@@ -400,7 +400,7 @@ local function RenderDetail(session)
     yOfs = yOfs - 8
 
     -- ── Incoming CC ───────────────────────────────────────────────────────────
-    AddDetailLine(detailPanel, yOfs, "Incoming CC  (enemy → you)", C_IN[1], C_IN[2], C_IN[3])
+    AddDetailLine(detailPanel, yOfs, "Incoming CC  (enemy -> you)", C_IN[1], C_IN[2], C_IN[3])
     yOfs = yOfs - 18
 
     AddDetailRow(detailPanel, yOfs, "Spell", "Avoid%  (A / Tries)",

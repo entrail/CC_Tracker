@@ -76,18 +76,6 @@ local function InitDB()
     CCTrackerDB.settings = CCTrackerDB.settings or {
         minimapAngle = 225,
     }
-    -- Per-type tracking flags: false = don't record future sessions of that type.
-    -- We merge-in defaults so existing installs get all types enabled on upgrade.
-    CCTrackerDB.settings.track = CCTrackerDB.settings.track or {}
-    local trackDefaults = {
-        arena_rated = true, arena_skirmish = true,
-        pvp = true, party = true, raid = true, world = true,
-    }
-    for k, v in pairs(trackDefaults) do
-        if CCTrackerDB.settings.track[k] == nil then
-            CCTrackerDB.settings.track[k] = v
-        end
-    end
     -- History window type-filter state (all enabled by default)
     CCTrackerDB.settings.historyFilter = CCTrackerDB.settings.historyFilter or {}
     local historyFilterDefaults = {
